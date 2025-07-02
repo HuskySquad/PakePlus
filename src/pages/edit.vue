@@ -985,12 +985,6 @@ const loadHtml = async () => {
         const isExists = await exists(indexHtml)
         if (isExists) {
             const files = await readDirRecursively(selected)
-            if (files.length >= fileLimitNumber) {
-                oneMessage.error(
-                    t('fileLimitNumber', { number: fileLimitNumber })
-                )
-                return
-            }
             const configUrl = `index.html (${t('moreAssets')}+${files.length})`
             store.currentProject.url = configUrl
             store.currentProject.htmlPath = selected
@@ -1617,10 +1611,14 @@ const easyLocal = async () => {
         const rhscript = await readStaticFile('rhscript.txt')
         // replace ppexe path
         const ppexePath: string = await invoke('get_exe_dir', { parent: false })
+        // log path
+        const logPath: string = await join(ppExeDir, 'data', 'rh.log')
         console.log('ppexePath', ppexePath)
         const rhtarget = rhscript
             .replace('PakePlus.exe', ppexePath)
             .replace('Target.exe', targetExe)
+            .replace('rh.log', logPath)
+            .replace('app.ico', icoPath)
         const rhscriptPath = await join(ppExeDir, 'data', 'rhscript.txt')
         await writeTextFile(rhscriptPath, rhtarget)
     } else {
@@ -1729,7 +1727,17 @@ const publishCheck = async () => {
     loadingText(t('preCheck') + '...')
     await new Promise((resolve) => setTimeout(resolve, 3000))
     if (store.currentProject.desktop.buildMethod === 'local') {
-        await easyLocal()
+        try {
+            await easyLocal()
+        } catch (error: any) {
+            console.error('easyLocal error', error)
+            warning.value = error.message
+            buildLoading.value = false
+            buildSecondTimer && clearInterval(buildSecondTimer)
+            buildTime = 0
+            buildRate.value = 0
+            return
+        }
     } else if (store.token === '') {
         oneMessage.error(t('configToken'))
         buildLoading.value = false
